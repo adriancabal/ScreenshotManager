@@ -139,6 +139,15 @@ export default function MainScreen({ navigation }: Props): React.JSX.Element {
             Manually Scan for New Screenshots
           </Text>
         </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.primaryButton}
+          onPress={() => navigation.navigate('Gallery')}
+        >
+          <Text style={styles.primaryButtonText}>
+            📸 View Screenshots
+          </Text>
+        </TouchableOpacity>
       </View>
     </View>
   );
@@ -272,5 +281,17 @@ const styles = StyleSheet.create({
     color: '#374151',
     fontSize: 15,
     fontWeight: '600',
+  },
+  primaryButton: {
+    backgroundColor: '#4F46E5',
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+    marginTop: 16,
+  },
+  primaryButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '700',
   },
 });
