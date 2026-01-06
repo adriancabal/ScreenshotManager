@@ -7,15 +7,14 @@ import {
   StyleSheet,
   FlatList,
   Image,
-  Modal,
   Dimensions,
   ActivityIndicator,
-  ScrollView,
 } from 'react-native';
 import RNFS from 'react-native-fs';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../App';
 import { SCREENSHOT_TEST_FOLDER } from '../utils/constants';
+import ImageView from 'react-native-image-viewing';
 
 type GalleryScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'Gallery'>;
 
@@ -34,7 +33,8 @@ const IMAGE_SIZE = (width - 48) / 3; // 3 images per row with padding
 export default function GalleryScreen({ navigation }: Props): React.JSX.Element {
   const [screenshots, setScreenshots] = useState<Screenshot[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [selectedIndex, setSelectedIndex] = useState(0);
+  const [isViewerOpen, setIsViewerOpen] = useState(false);
 
   useEffect(() => {
     loadScreenshots();
@@ -74,10 +74,13 @@ export default function GalleryScreen({ navigation }: Props): React.JSX.Element 
     }
   };
 
-  const renderScreenshot = ({ item }: { item: Screenshot }) => (
+  const renderScreenshot = ({ item, index }: { item: Screenshot; index: number }) => (
     <TouchableOpacity
       style={styles.imageContainer}
-      onPress={() => setSelectedImage(item.path)}
+      onPress={() => {
+        setSelectedIndex(index);
+        setIsViewerOpen(true);
+      }}
     >
       <Image
         source={{ uri: `file://${item.path}` }}
@@ -130,36 +133,13 @@ export default function GalleryScreen({ navigation }: Props): React.JSX.Element 
         </View>
       )}
 
-      {/* Full Screen Image Modal */}
-      <Modal
-        visible={selectedImage !== null}
-        transparent={false}
-        animationType="fade"
-        onRequestClose={() => setSelectedImage(null)}
-      >
-        <View style={styles.modalContainer}>
-          <ScrollView
-            style={styles.scrollView}
-            contentContainerStyle={styles.scrollViewContent}
-            maximumZoomScale={5}
-            minimumZoomScale={1}
-            showsHorizontalScrollIndicator={false}
-            showsVerticalScrollIndicator={false}
-          >
-            <Image
-              source={{ uri: selectedImage ? `file://${selectedImage}` : '' }}
-              style={styles.fullImage}
-              resizeMode="contain"
-            />
-          </ScrollView>
-          <TouchableOpacity
-            style={styles.closeButton}
-            onPress={() => setSelectedImage(null)}
-          >
-            <Text style={styles.closeButtonText}>✕</Text>
-          </TouchableOpacity>
-        </View>
-      </Modal>
+      {/* Full Screen Image Viewer with Pinch-to-Zoom */}
+      <ImageView
+        images={screenshots.map(s => ({ uri: `file://${s.path}` }))}
+        imageIndex={selectedIndex}
+        visible={isViewerOpen}
+        onRequestClose={() => setIsViewerOpen(false)}
+      />
     </View>
   );
 }
@@ -241,37 +221,5 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#6B7280',
     textAlign: 'center',
-  },
-  modalContainer: {
-    flex: 1,
-    backgroundColor: '#000',
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollViewContent: {
-    flexGrow: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  fullImage: {
-    width: width,
-    height: height,
-  },
-  closeButton: {
-    position: 'absolute',
-    top: 50,
-    right: 20,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  closeButtonText: {
-    fontSize: 24,
-    color: '#fff',
-    fontWeight: 'bold',
   },
 });
