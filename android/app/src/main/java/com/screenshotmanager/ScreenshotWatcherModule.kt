@@ -7,8 +7,10 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.os.Build
 import android.os.FileObserver
+import android.provider.Settings
 import androidx.core.app.NotificationCompat
 import com.facebook.react.bridge.*
 import com.facebook.react.modules.core.DeviceEventManagerModule
@@ -32,6 +34,20 @@ class ScreenshotWatcherModule(private val reactContext: ReactApplicationContext)
 
     init {
         createNotificationChannel()
+    }
+
+    @ReactMethod
+    fun openManageAllFilesSettings(promise: Promise) {
+        try {
+            val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION).apply {
+                data = Uri.parse("package:${reactContext.packageName}")
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK
+            }
+            reactContext.startActivity(intent)
+            promise.resolve(true)
+        } catch (e: Exception) {
+            promise.reject("ERROR", "Failed to open settings: ${e.message}")
+        }
     }
 
     @ReactMethod

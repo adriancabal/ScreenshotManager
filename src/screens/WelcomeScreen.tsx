@@ -30,27 +30,48 @@ export default function WelcomeScreen({ navigation }: Props): React.JSX.Element 
     setLoading(true);
     
     try {
+      console.log('Requesting permissions...');
       const hasPermissions = await requestPermissions();
+      console.log('Permissions result:', hasPermissions);
       
       if (!hasPermissions) {
+        setLoading(false);
         Alert.alert(
-          'Permissions Required',
-          'Please grant storage permissions to use this app.'
+          'Permission Needed',
+          'After granting "All files access" in Settings, please come back and press "Get Started" again.'
+        );
+        return;
+      }
+
+      console.log('Creating folder...');
+      const folderPath = `${RNFS.ExternalStorageDirectoryPath}/${SCREENSHOT_TEST_FOLDER}`;
+      console.log('Folder path:', folderPath);
+      
+      // Try to create folder - if it fails, permissions weren't granted
+      try {
+        const folderExists = await RNFS.exists(folderPath);
+        
+        if (!folderExists) {
+          await RNFS.mkdir(folderPath);
+          console.log('Folder created successfully');
+        }
+      } catch (mkdirError) {
+        console.error('Folder creation error:', mkdirError);
+        Alert.alert(
+          'Permission Required',
+          'Could not create folder. Please go to Settings > Apps > Screenshot Manager > Permissions and enable "Files and media" or "All files access", then try again.'
         );
         setLoading(false);
         return;
       }
 
-      const folderPath = `${RNFS.ExternalStorageDirectoryPath}/${SCREENSHOT_TEST_FOLDER}`;
-      const folderExists = await RNFS.exists(folderPath);
-      
-      if (!folderExists) {
-        await RNFS.mkdir(folderPath);
-      }
-
       if (importExisting) {
+        console.log('Copying existing screenshots...');
         const copiedCount = await copyExistingScreenshots(folderPath);
+        console.log('Copied count:', copiedCount);
         await AsyncStorage.setItem('copiedCount', copiedCount.toString());
+      } else {
+        await AsyncStorage.setItem('copiedCount', '0');
       }
 
       await AsyncStorage.setItem('hasLaunched', 'true');
@@ -60,7 +81,8 @@ export default function WelcomeScreen({ navigation }: Props): React.JSX.Element 
       navigation.replace('Main');
     } catch (error) {
       console.error('Setup error:', error);
-      Alert.alert('Error', 'Failed to set up the app. Please try again.');
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      Alert.alert('Error', `Failed to set up: ${errorMessage}\n\nCheck console for details.`);
       setLoading(false);
     }
   };

@@ -1,7 +1,36 @@
 // src/services/PermissionService.ts
-import { PermissionsAndroid, Platform } from 'react-native';
+import { PermissionsAndroid, Platform, Linking, Alert, NativeModules } from 'react-native';
 import RNFS from 'react-native-fs';
 import { SCREENSHOT_PATHS } from '../utils/constants';
+
+const { ScreenshotWatcherModule } = NativeModules;
+
+const checkStorageAccess = async (): Promise<boolean> => {
+  try {
+    // Try to create a test file in external storage
+    const testPath = `${RNFS.ExternalStorageDirectoryPath}/.screenshot_manager_test`;
+    await RNFS.writeFile(testPath, 'test', 'utf8');
+    await RNFS.unlink(testPath);
+    return true;
+  } catch (error) {
+    console.log('Storage access check failed:', error);
+    return false;
+  }
+};
+
+const openManageAllFilesSettings = async () => {
+  try {
+    if (ScreenshotWatcherModule && ScreenshotWatcherModule.openManageAllFilesSettings) {
+      await ScreenshotWatcherModule.openManageAllFilesSettings();
+    } else {
+      // Fallback
+      Linking.openSettings();
+    }
+  } catch (error) {
+    console.error('Error opening settings:', error);
+    Linking.openSettings();
+  }
+};
 
 export const requestPermissions = async (): Promise<boolean> => {
   if (Platform.OS !== 'android') return true;
@@ -9,37 +38,55 @@ export const requestPermissions = async (): Promise<boolean> => {
   try {
     const androidVersion = Platform.Version;
 
-    // Android 13+ (API 33+) requires READ_MEDIA_IMAGES
-    if (androidVersion >= 33) {
-      const granted = await PermissionsAndroid.request(
-        PermissionsAndroid.PERMISSIONS.READ_MEDIA_IMAGES,
-        {
-          title: 'Screenshot Manager Permissions',
-          message: 'This app needs access to your photos and screenshots to organize them.',
-          buttonPositive: 'OK',
-        }
-      );
-      return granted === PermissionsAndroid.RESULTS.GRANTED;
-    } 
-    // Android 11-12 (API 30-32)
-    else if (androidVersion >= 30) {
-      const granted = await PermissionsAndroid.request(
-        PermissionsAndroid.PERMISSIONS.READ_EXTERNAL_STORAGE,
-        {
-          title: 'Screenshot Manager Permissions',
-          message: 'This app needs access to your storage to organize screenshots.',
-          buttonPositive: 'OK',
-        }
-      );
-      return granted === PermissionsAndroid.RESULTS.GRANTED;
+    // Android 11+ (API 30+) requires MANAGE_EXTERNAL_STORAGE
+    if (androidVersion >= 30) {
+      // First check if we already have access
+      const hasAccess = await checkStorageAccess();
+      
+      if (hasAccess) {
+        console.log('Storage access already granted');
+        return true;
+      }
+
+      // If not, guide user to settings
+      return new Promise((resolve) => {
+        Alert.alert(
+          'Storage Permission Required',
+          'This app needs "All files access" permission to manage screenshots.\n\nYou\'ll see a settings page. Please enable "Allow management of all files" for Screenshot Manager.',
+          [
+            { 
+              text: 'Cancel', 
+              style: 'cancel',
+              onPress: () => resolve(false)
+            },
+            { 
+              text: 'Open Settings', 
+              onPress: async () => {
+                await openManageAllFilesSettings();
+                resolve(false);
+              }
+            }
+          ]
+        );
+      });
     }
     // Android 10 and below
     else {
       const readGranted = await PermissionsAndroid.request(
-        PermissionsAndroid.PERMISSIONS.READ_EXTERNAL_STORAGE
+        PermissionsAndroid.PERMISSIONS.READ_EXTERNAL_STORAGE,
+        {
+          title: 'Storage Permission',
+          message: 'This app needs access to your storage to manage screenshots.',
+          buttonPositive: 'OK',
+        }
       );
       const writeGranted = await PermissionsAndroid.request(
-        PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE
+        PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE,
+        {
+          title: 'Storage Permission',
+          message: 'This app needs access to write to your storage.',
+          buttonPositive: 'OK',
+        }
       );
       return (
         readGranted === PermissionsAndroid.RESULTS.GRANTED &&
